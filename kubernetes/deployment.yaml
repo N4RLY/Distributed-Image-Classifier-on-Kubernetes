@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: image-classifier
+  namespace: image-classifier
+  labels:
+    app: image-classifier
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: image-classifier
+  template:
+    metadata:
+      labels:
+        app: image-classifier
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8001"
+    spec:
+      containers:
+      - name: image-classifier
+        image: image-classifier:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8000
+          name: http
+        - containerPort: 8001
+          name: metrics
+        env:
+        - name: MODEL_PATH
+          value: "/models/mobilenet_v2_1.0_224_frozen.pb"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: PORT
+          value: "8000"
+        - name: METRICS_PORT
+          value: "8001"
+        - name: WORKERS
+          value: "2"
+        - name: ENABLE_GPU
+          value: "false"
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+        - name: models-volume
+          mountPath: /models
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+      volumes:
+      - name: config-volume
+        configMap:
+          name: image-classifier-config
+      - name: models-volume
+        emptyDir: {}
